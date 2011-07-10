@@ -145,8 +145,7 @@ namespace gap{
       }
       Self& operator++() {
 	cur++;
-	if( cur == gap_begin )
-	  cur += (gap_end - gap_begin);
+	cur = cur == gap_begin ? cur + (gap_end - gap_begin) : cur;
 	return *this;
       }
       Self operator++( int ) {
@@ -155,9 +154,7 @@ namespace gap{
 	return itr;
       }
       Self& operator--() {
-	if( cur == gap_end )
-	  cur -= 1+(gap_end-gap_begin);
-	else --cur;
+	cur = cur == gap_end ? cur - (gap_end-gap_begin) -1 : cur - 1;
 	return *this;	
       }
       Self operator--( int ) {
@@ -330,6 +327,7 @@ namespace gap{
 	insert( begin(), first, last );
       }	catch(...) {
 	m_release_buf();
+	throw;
       }
     }
   
@@ -361,6 +359,7 @@ namespace gap{
 	m_range_insert( begin(), init.begin(), init.end(), std::random_access_iterator_tag() );
       } catch(...) {
 	m_release_buf();
+	throw;
       }
     }
 #endif
@@ -396,11 +395,16 @@ namespace gap{
 #endif
 
 
+#if !__GAP_CXX11__
     // insert後は、itrにあった要素がgapの直後にくるようになる
     iterator insert( const iterator& itr, const value_type& e )
     { return m_emplace( itr, e ); }
-  
-#if __GAP_CXX11__
+#else
+    iterator insert( const iterator& itr, const value_type& e ) {
+      value_type t = e;
+      return m_emplace( itr, std::move(t) );
+    }
+
     iterator insert( const iterator& itr, value_type&& e )
     { return emplace( itr, std::move(e) ); }
 
@@ -446,11 +450,16 @@ namespace gap{
 	gap_begin = f; gap_end = l;
       }
     }
-  
+
+#if !__GAP_CXX11__
     // push_back insert( end(), e ) と同じ
     void push_back( const value_type& e ) { m_emplace_back(e); }
+#else
+    void push_back( const value_type& e ) {
+      value_type t = e;
+      m_emplace_back(std::move(t));
+    }
 
-#if __GAP_CXX11__
     template<typename... Args>
     void emplace_back( Args&& ... args )
     { m_emplace_back( std::forward<Args>(args)... ); }
@@ -463,9 +472,14 @@ namespace gap{
       else erase( --end() );
     }
 
+#if !__GAP_CXX11__
     void push_front( const value_type& e ) { m_emplace_front(e); }
+#else
+    void push_front( const value_type& e ) {
+      value_type t = e;
+      m_emplace_front(std::move(t));
+    }
 
-#if __GAP_CXX11__
     template<typename... Args>
     void emplace_front( Args&& ... args )
     { m_emplace_front( std::forward<Args>(args)... ); }
