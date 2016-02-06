@@ -13,3 +13,20 @@
 
 現在の版での注意点
   いくつかの関数が、gccのlibstdc++に依存しています。具体的にはstd::_Destroyを呼び出しています。これのない環境で利用する場合には、適当に置きかえてください。
+
+What is this?
+  An implementation of GAP BUFFER in C++.
+  Exceptions have been made paying attention to safety and efficiency.
+  C++11 features are used in the corresonding clode.
+
+How to use
+  Implementation is header only, just include the header to use it.
+  This has been designed to have the same interface as std::vector.
+
+Development environment
+  gcc 4.5.2
+  libstdc ++ 6.5.4
+
+Notes in the current edition
+  Some functions, rely on gcc and libstdc++. Specifically, we call std::_Destroy.
+  In the case to be used in another environment, please suitably replace this.
