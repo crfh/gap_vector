@@ -1,6 +1,9 @@
 /* gap_vector コンテナ
  * このファイルは public-domain とします
- */
+ *
+ * Gap_vector container
+ * This file is a public-domain
+ */
 
 /* 特徴
  * この実装では、例外安全性についてかなり注意を払っています。
@@ -12,6 +15,15 @@
  * * __GAP_CXX11__ // これを1にすると、c++11用のコードが展開されます  gcc 4.5に関しては、自動でこれを行います
  * * std::_Destroy // 区間に対してallocator.destroyを呼び出す関数です
  *
+ * Characteristic
+ * In this implementation, we quite paying attention to the exception safety.
+ * It also contains code for the C ++ 11 support.
+ *
+ * Caution
+ * These variables must be set.
+ *  NDEBUG // If this #define then, debugging code will be omitted.
+ *  __GAP_CXX11__ // If this is to 1, with regard to the gcc 4.5 C++ 11 will extensions will ben enabled automatically.
+ *  std :: function to call the allocator.destroy against _ Destroy // interval
  */
 
 #ifndef GAP_VECTOR_HPP
@@ -44,6 +56,7 @@
 namespace gap{
 
   // 下は uninitialized に含まれない
+  // Below is not included in the uninitialized
   namespace {
     template< typename InputIter, typename ForwardIter, typename Alloc >
     ForwardIter uninitialized_copy_a( InputIter first, InputIter last,
@@ -99,6 +112,7 @@ namespace gap{
 
 
   // gapのイテレータは、速くはない
+  // gap of iterator, fast is not
   namespace{
     template< typename Tp, typename DiffTp, typename PtrTp, typename RefTp >
       struct gap_iterator_base : public std::iterator<std::random_access_iterator_tag,Tp,
@@ -279,6 +293,32 @@ namespace gap{
   // 基本的に、コピーやムーブで例外を出すようなオブジェクトは、unique_ptrに入れるべき
 
   // インターフェースはvectorといっしょ
+  //
+  // In gap_vector, in a variety of operations, a copy of the internal data is generated
+  // As a result, the exception safety of type T, is very involved in the exception safety
+  // of gap_vector<T>.
+  //
+  // In the case that T's destructor to be stored raises an exception, then gap_vector<T> has no
+  // exception safety. This is not likely.
+  //
+  // In the case T's move constructor throws an exception,gap_vector<T> has a basic exception guarantee.
+  // On the other hand, if T's move constructor does not throw an exception, then gap_vector<T> has a
+  // strong exception safety guarantee.
+  //
+  // If the move constructor to the type to be stored is not defined, then the following rules apply:
+  //
+  //    - If the type of the copy constructor to be stored if raises an exception, gap_vector is,
+  //    the basic exception safety guarantee
+  //
+  //    - If the type of the copy constructor to be stored does not throw an exception, then gap_vector
+  //     has a strong exception safety guarantee.
+  //
+  // For more information refer to each of the member function declaration
+  // (have not written what is in accordance with the above rules)
+  //
+  // In addition, in the case of the operation is not a const, note that the iterator is almost certainly destroyed
+  // in the vector, but only sometimes destroyed in the gap_vector, where it could arguably be destroyed at anytime.
+ 
   template< typename Tp, typename Alloc = std::allocator<Tp> >
   class gap_vector {
   public:
@@ -346,6 +386,7 @@ namespace gap{
 
 #if __GAP_CXX11__
     // ムーブコンストラクタは例外を送出しない
+    // Move constructor does not throw an exception
     gap_vector( gap_vector&& rhs )
       : bbegin(rhs.bbegin), bend(rhs.bend),
 	gap_begin(rhs.gap_begin), gap_end(rhs.gap_end), allocator( std::move(rhs.allocator) )
@@ -369,6 +410,7 @@ namespace gap{
 
     gap_vector& operator=( const gap_vector& rhs ){
       // データのコピー成功後にバッファの解放を行う
+      // Make the release of the buffer after a successful copy of the data
       size_type sz = rhs.size();
       pointer buf = allocator.allocate( sz );
       try{
@@ -383,6 +425,7 @@ namespace gap{
     }
 #if __GAP_CXX11__
     // ムーブは例外を送出しない
+    // Move does not throw an exception
     gap_vector& operator=( gap_vector&& rhs ){
       m_release_buf();
       bbegin = rhs.bbegin;
@@ -397,6 +440,7 @@ namespace gap{
 
 #if !__GAP_CXX11__
     // insert後は、itrにあった要素がgapの直後にくるようになる
+    // insert after, there were elements in itr is to come immediately after the gap
     iterator insert( const iterator& itr, const value_type& e )
     { return m_emplace( itr, e ); }
 #else
@@ -422,6 +466,8 @@ namespace gap{
 
 
     // itr の位置の要素を削除し、gapの位置をitrのあった場所から始まるように移動する
+    // It removes the element of the position of itr, to move the position of the gap to
+    // begin from a place of itr
     void erase( const iterator& itr ){
       pointer ptr = itr;
       if( gap_begin < ptr ){
@@ -436,12 +482,12 @@ namespace gap{
     void erase( const iterator& first, const iterator& last ){
       pointer f = first, l = last;
       if( f > gap_end ) {
-	m_move_rtl( f ); // fより前を移動
+	m_move_rtl( f ); // fより前を移動        Move before the f
 	Destroy( f, l, allocator );
 	gap_end = l;
       } else if( l <= gap_end ) {
 	if( l == gap_end ) l = gap_begin;
-	else m_move_ltr( l ); // lを含めて移動
+	else m_move_ltr( l ); // lを含めて移動   Move, including the l
 	Destroy( f, l, allocator );
 	gap_begin = f;
       } else {
@@ -453,6 +499,7 @@ namespace gap{
 
 #if !__GAP_CXX11__
     // push_back insert( end(), e ) と同じ
+    // push_back insert (end (), e) the same
     void push_back( const value_type& e ) { m_emplace_back(e); }
 #else
     void push_back( const value_type& e ) {
@@ -493,6 +540,7 @@ namespace gap{
     }
 
     // gapの幅を広げる  つまり、gapの論理的な位置を変えない
+    // That spread the width of the gap, it does not alter the logical location of the gap
     void reserve( size_type n ){
       if( n >= max_size() )
 	throw std::length_error("gap_vector::reserve");
@@ -510,6 +558,7 @@ namespace gap{
 
     // shrink_to_fitはc++98でも実現でき、便利なので、どちらでも使えるようにしている
     // cbegin, cend もそう
+    // shrink_to_fit can be realized even c ++ 98, so that because it is convenient, can be used either
     void shrink_to_fit() {
       size_type sz = size();
       pointer buf = allocator.allocate( sz );
@@ -623,18 +672,20 @@ namespace gap{
 #endif
   
   private:
-    pointer bbegin;        // メモリ領域の先頭
-    pointer bend;          // メモリ領域の末尾  [bbegin,bend)
-    pointer gap_begin;     // gap の先頭
-    pointer gap_end;       // gap の末尾 [gap_begin,gap_end)
+    pointer bbegin;        // メモリ領域の先頭                  The beginning of the memory area
+    pointer bend;          // メモリ領域の末尾  [bbegin,bend)   The end of the memory area [bbegin, bend)
+    pointer gap_begin;     // gap の先頭                        The beginning of the gap
+    pointer gap_end;       // gap の末尾 [gap_begin,gap_end)    // The end of the gap [gap_begin, gap_end)
     alloc_type allocator;
 
   private:
   
     // 2倍伸長ルールで、新しい領域の大きさを決める
+    // At twice the extension rules, determine the size of the new area
     size_type m_next_size() const { return bend-bbegin ? ((bend-bbegin)<<1) : 1; }
 
     // 新しいバッファへ全要素を転送する
+    //  To transfer all the elements to a new buffer
     void m_move_to_newbuf( pointer buf, size_type sz ) {
       uninitialized_copy_a( GAP_MAKE_MOVE_ITER(bbegin),
 				   GAP_MAKE_MOVE_ITER(gap_begin),
@@ -656,6 +707,7 @@ namespace gap{
     }
 
     // 新しいgap位置を受け取るバージョン
+    // Version to receive a new gap position
     void m_move_to_newbuf( pointer buf, pointer g, size_type sz ){
       if( g < gap_end ){
 	size_type r1 = g - bbegin;
@@ -715,6 +767,7 @@ namespace gap{
     }
   
     // shrink_to_fitで未初期化領域へデータをコピーする
+    // To copy the data to the uninitialized area in shrink_to_fit
     void m_copy_to_buf( pointer buf, alloc_type& al ) const {
       uninitialized_copy_a( bbegin, gap_begin, buf, al );
       try{
@@ -734,6 +787,7 @@ namespace gap{
     }
 
     // [gap_end, ptr) を、gap_beginへ移動する
+    // [Gap_end, the ptr), move to gap_begin
     void m_move_rtl( pointer ptr ){
       pointer nwgap_end = gap_begin + (ptr - gap_end);
       if( nwgap_end < gap_end ){
@@ -763,9 +817,10 @@ namespace gap{
     }
 
     // [ptr, gap_begin) を、gap_endの直前へ移動する
+    // [Ptr, the gap_begin), move to the previous gap_end
     void m_move_ltr( pointer ptr ){
-      size_type mvn = gap_begin - ptr; // 移動する個数
-      pointer nwgap_end = gap_end - mvn; // 新しい gap_end;
+      size_type mvn = gap_begin - ptr; // 移動する個数;     The number to be moved
+      pointer nwgap_end = gap_end - mvn; // 新しい gap_end; New gap_end
       if( nwgap_end < gap_begin ){
 	size_type un = gap_end - gap_begin;
 	uninitialized_copy_a( GAP_MAKE_MOVE_ITER(gap_begin-un),
@@ -793,6 +848,7 @@ namespace gap{
   
 
     // gapの位置をitrの直前に変える
+    // Changing the position of the gap just before the itr
     void m_make_gap( const iterator& itr ){
       pointer ptr = itr;
       if( gap_begin < ptr )
@@ -928,6 +984,8 @@ namespace gap{
   // ...
   // とすること
   // swapは例外を送出しない
+  //
+  // swap does not throw an exception
   template< typename Tp, typename Alloc >
   void swap( gap_vector<Tp,Alloc>& lhs, gap_vector<Tp,Alloc>& rhs )
   { lhs.swap( rhs ); }
